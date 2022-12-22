@@ -2,6 +2,9 @@ import sys
 
 from clang.cindex import Index, CursorKind
 
+# Config.set_library_path('/usr/local/opt/llvm/lib')
+# Config.set_library_file('/usr/local/opt/llvm/lib/libclang.dylib')
+
 def comment_out_function(input_filename, output_filename, function_name):
     # Create an Index object
     index = Index.create()

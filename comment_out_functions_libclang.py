@@ -59,7 +59,7 @@ def get_unused_members(serach_error):
 
 def comment_functions(tu):
     unused_functions = get_unused_members("unusedFunction")
-    for unused_function in unused_functions:
+    for idx, unused_function in enumerate(unused_functions):
         instances = visit(
             node=tu.cursor,
             search_node_name=unused_function,
@@ -69,28 +69,25 @@ def comment_functions(tu):
             # print("".join(lines))
             print(
                 COLOR_OKGREEN
-                + "commented function {}: {} times".format(unused_function, instances)
+                + "[{}/{}]commented function {}: {} times".format(
+                    idx + 1, len(unused_functions), unused_function, instances
+                )
                 + COLOR_ENDC
             )
         else:
             print(
-                "couldn't find function: {} (within nodetypes: {})".format(
-                    unused_function, [clang.cindex.CursorKind.FUNCTION_DECL]
+                "[{}/{}]couldn't find function: {} (within nodetypes: {})".format(
+                    idx + 1,
+                    len(unused_functions),
+                    unused_function,
+                    [clang.cindex.CursorKind.FUNCTION_DECL],
                 )
             )
 
 
 def comment_struct_members(tu):
     unused_struct_members = get_unused_members("unusedStructMember")
-    # unused_struct_members = [
-    #     re.findall("'([^']*)'", "".join(err.split(" ")))[0]
-    #     for err in errors
-    #     if "unusedStructMember" in err
-    # ]
-
-    # print(unused_struct_members)
-
-    for unused_struct_member in unused_struct_members:
+    for idx, unused_struct_member in enumerate(unused_struct_members):
         instances = visit(
             node=tu.cursor,
             search_node_name=unused_struct_member,
@@ -100,23 +97,28 @@ def comment_struct_members(tu):
             # print("".join(lines))
             print(
                 COLOR_OKGREEN
-                + "commented struct_member {}: {} times".format(
-                    unused_function, instances
+                + "[{}/{}]commented struct_member {}: {} times".format(
+                    idx + 1, len(unused_struct_members), unused_function, instances
                 )
                 + COLOR_ENDC
             )
         else:
             print(
-                "couldn't find struct_member: {} (within nodetypes: {})".format(
-                    unused_struct_member, [clang.cindex.CursorKind.STRUCT_DECL]
+                "[{}/{}]couldn't find struct_member: {} (within nodetypes: {})".format(
+                    idx + 1,
+                    len(unused_struct_members),
+                    unused_struct_member,
+                    [clang.cindex.CursorKind.STRUCT_DECL],
                 )
             )
+
 
 def write_to_output_file():
     output_filename = input_filename.replace(".cpp", "_commented.cpp")
     print("Saving the prceedings so far to file: {}".format(output_filename))
     with open(output_filename, "w") as output_file:
         output_file.write("".join(lines))
+
 
 index = clang.cindex.Index.create()
 tu = index.parse(input_filename)
@@ -127,4 +129,3 @@ print("=======")
 comment_struct_members(tu)
 write_to_output_file()
 print("=======")
-

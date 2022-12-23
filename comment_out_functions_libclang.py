@@ -25,7 +25,7 @@ def visit(
 ):
     has_commented = False
     # if node.spelling=="__mbstate_t":
-    print(node.spelling, "=>", node.kind, node.extent.start.line)
+    # print(node.spelling, "=>", node.kind, node.extent.start.line)
     for child in node.get_children():
         has_commented |= visit(child, search_fn_name)
 
@@ -61,9 +61,9 @@ def comment_functions(tu):
             search_node_kind=[clang.cindex.CursorKind.FUNCTION_DECL],
         ):
             # print("".join(lines))
-            print("commented:", unused_function)
+            print("commented function:", unused_function)
         else:
-            print("couldn't find fn:", unused_function)
+            print("couldn't find function:", unused_function)
 
 
 def comment_struct_members(tu):
@@ -82,7 +82,7 @@ def comment_struct_members(tu):
             search_node_kind=[clang.cindex.CursorKind.STRUCT_DECL],
         ):
             # print("".join(lines))
-            print("commented:", unused_struct_member)
+            print("commented struct_member:", unused_struct_member)
         else:
             print("couldn't find struct_member:", unused_struct_member)
 

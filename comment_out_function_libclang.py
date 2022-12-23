@@ -44,5 +44,4 @@ output_filename = sys.argv[2]
 function_name = sys.argv[3]
 
 # Call the comment_out_function function
-comment_out_function(input_filename, output
-
+comment_out_function(input_filename, output_filename, function_name)

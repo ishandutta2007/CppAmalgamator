@@ -23,11 +23,11 @@ def is_starting_line_of_function(node, search_fn_name):
 def visit(
     node, search_fn_name, search_node_kind=[clang.cindex.CursorKind.FUNCTION_DECL]
 ):
-    has_commented = False
+    commented_cnt = 0
     # if node.spelling=="__mbstate_t":
     # print(node.spelling, "=>", node.kind, node.extent.start.line)
     for child in node.get_children():
-        has_commented |= visit(child, search_fn_name)
+        commented_cnt += visit(child, search_fn_name)
 
     if (
         node.kind
@@ -36,8 +36,8 @@ def visit(
     ) and is_starting_line_of_function(node, search_fn_name):
         for line_no in range(node.extent.start.line - 1, node.extent.end.line):
             lines[line_no] = "// " + lines[line_no]
-        has_commented |= True
-    return has_commented
+        commented_cnt += True
+    return commented_cnt
 
 
 cppcheck_filename = input_filename.replace(".cpp", "_cppcheck.txt")
@@ -55,13 +55,14 @@ def comment_functions(tu):
     print(unused_functions)
 
     for unused_function in unused_functions:
-        if visit(
+        instances = visit(
             node=tu.cursor,
             search_fn_name=unused_function,
             search_node_kind=[clang.cindex.CursorKind.FUNCTION_DECL],
-        ):
+        )
+        if instances > 0:
             # print("".join(lines))
-            print("commented function:", unused_function)
+            print("commented function {}: {} times".format(unused_function, instances))
         else:
             print("couldn't find function:", unused_function)
 
@@ -76,13 +77,18 @@ def comment_struct_members(tu):
     print(unused_struct_members)
 
     for unused_struct_member in unused_struct_members:
-        if visit(
+        instances = visit(
             node=tu.cursor,
             search_fn_name=unused_struct_member,
             search_node_kind=[clang.cindex.CursorKind.STRUCT_DECL],
-        ):
+        )
+        if instances > 0:
             # print("".join(lines))
-            print("commented struct_member:", unused_struct_member)
+            print(
+                "commented struct_member {}: {} times".format(
+                    unused_function, instances
+                )
+            )
         else:
             print("couldn't find struct_member:", unused_struct_member)
 

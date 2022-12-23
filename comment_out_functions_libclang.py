@@ -59,14 +59,6 @@ def get_unused_members(serach_error):
 
 def comment_functions(tu):
     unused_functions = get_unused_members("unusedFunction")
-    # unused_functions = [
-    #     re.findall("'([^']*)'", "".join(err.split(" ")))[0]
-    #     for err in errors
-    #     if "unusedFunction" in err
-    # ]
-
-    # print(unused_functions)
-
     for unused_function in unused_functions:
         instances = visit(
             node=tu.cursor,
@@ -115,20 +107,23 @@ def comment_struct_members(tu):
             )
         else:
             print(
-                +"couldn't find struct_member: {} (within nodetypes: {})".format(
+                "couldn't find struct_member: {} (within nodetypes: {})".format(
                     unused_struct_member, [clang.cindex.CursorKind.STRUCT_DECL]
                 )
             )
 
+def write_to_output_file():
+    output_filename = input_filename.replace(".cpp", "_commented.cpp")
+    with open(output_filename, "w") as output_file:
+        output_file.write("".join(lines))
 
 index = clang.cindex.Index.create()
 tu = index.parse(input_filename)
 print("=======")
 comment_functions(tu)
+write_to_output_file()
 print("=======")
 comment_struct_members(tu)
+write_to_output_file()
 print("=======")
 
-output_filename = input_filename.replace(".cpp", "_commented.cpp")
-with open(output_filename, "w") as output_file:
-    output_file.write("".join(lines))

@@ -20,15 +20,19 @@ def is_starting_line_of_function(node, search_fn_name):
     return False
 
 
-def visit(node, search_fn_name):
+def visit(
+    node, search_fn_name, search_node_kind=[clang.cindex.CursorKind.FUNCTION_DECL]
+):
     has_commented = False
-    # print(node.spelling, node.kind)
+    # if node.spelling=="__mbstate_t":
+    print(node.spelling, "=>", node.kind, node.extent.start.line)
     for child in node.get_children():
         has_commented |= visit(child, search_fn_name)
 
     if (
-        node.kind == clang.cindex.CursorKind.FUNCTION_DECL
-        or node.kind == clang.cindex.CursorKind.CXX_METHOD
+        node.kind
+        in search_node_kind  # clang.cindex.CursorKind.TYPEDEF_DECL#
+        # or node.kind == clang.cindex.CursorKind.CXX_METHOD
     ) and is_starting_line_of_function(node, search_fn_name):
         for line_no in range(node.extent.start.line - 1, node.extent.end.line):
             lines[line_no] = "// " + lines[line_no]
@@ -40,23 +44,56 @@ cppcheck_filename = input_filename.replace(".cpp", "_cppcheck.txt")
 with open(cppcheck_filename) as f:
     errors = f.readlines()
 
-unused_functions = [
-    re.findall("'([^']*)'", "".join(err.split(" ")))[0]
-    for err in errors
-    if "unusedFunction" in err
-]
 
-print(unused_functions)
+def comment_functions(tu):
+    unused_functions = [
+        re.findall("'([^']*)'", "".join(err.split(" ")))[0]
+        for err in errors
+        if "unusedFunction" in err
+    ]
+
+    print(unused_functions)
+
+    for unused_function in unused_functions:
+        if visit(
+            node=tu.cursor,
+            search_fn_name=unused_function,
+            search_node_kind=[clang.cindex.CursorKind.FUNCTION_DECL],
+        ):
+            # print("".join(lines))
+            print("commented:", unused_function)
+        else:
+            print("couldn't find fn:", unused_function)
+
+
+def comment_struct_members(tu):
+    unused_struct_members = [
+        re.findall("'([^']*)'", "".join(err.split(" ")))[0]
+        for err in errors
+        if "unusedStructMember" in err
+    ]
+
+    print(unused_struct_members)
+
+    for unused_struct_member in unused_struct_members:
+        if visit(
+            node=tu.cursor,
+            search_fn_name=unused_struct_member,
+            search_node_kind=[clang.cindex.CursorKind.STRUCT_DECL],
+        ):
+            # print("".join(lines))
+            print("commented:", unused_struct_member)
+        else:
+            print("couldn't find struct_member:", unused_struct_member)
+
 
 index = clang.cindex.Index.create()
 tu = index.parse(input_filename)
-
-for unused_function in unused_functions:
-    if visit(node=tu.cursor, search_fn_name=unused_function):
-        # print("".join(lines))
-        print("commented:", unused_function)
-    else:
-        print("couldn't find:", unused_function)
+print("=======")
+comment_functions(tu)
+print("=======")
+comment_structures(tu)
+print("=======")
 
 output_filename = input_filename.replace(".cpp", "_commented.cpp")
 with open(output_filename, "w") as output_file:

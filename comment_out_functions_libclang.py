@@ -114,6 +114,7 @@ def comment_struct_members(tu):
 
 def write_to_output_file():
     output_filename = input_filename.replace(".cpp", "_commented.cpp")
+    print("Saving the prceedings so far to file: {}".format(output_filename))
     with open(output_filename, "w") as output_file:
         output_file.write("".join(lines))
 

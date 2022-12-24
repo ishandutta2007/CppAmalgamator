@@ -28,6 +28,7 @@ del gcov_lines[:4]
 # print(len(statcom_lines), len(gcov_lines))
 index = clang.cindex.Index.create()
 tu = index.parse(statically_commented_filename)
+dont_touch_lines = []
 
 
 def get_innermost_node_containing_line_no(node, line_number):
@@ -54,27 +55,96 @@ def get_ending_line_no_of_node_containing_line_no(line_number):
         return node_inner.extent.end.line
 
 
-def uncomment_parent_node(line_number):
-    node_inner = get_innermost_node_containing_line_no(tu.cursor, line_number)
-    if node_inner:
-        parent_node = node_inner.lexical_parent
+def uncomment_parent_node_by_node(node_inner, siblings=None):
+    if not node_inner:
+        return False
+    parent_node = node_inner.lexical_parent
+    print()
+    print("child=", node_inner.spelling, end=" ")
+    print(
+        node_inner.extent.start.line, node_inner.extent.end.line,
+    )
+    try:
+        print("parent=", parent_node.spelling, end=" ")
         print(
-            node_inner.extent.start.line,
-            node_inner.extent.end.line,
+            parent_node.extent.start.line, parent_node.extent.end.line,
+        )
+        if "expanded_commented.cpp" in parent_node.spelling:
+            print("Base case of recursion reached, hence returning")
+            return False
+    except Exception as e:
+        if siblings is None:
+            print("Invalid parent and has no sibling, hence returning")
+            return False
+        else:
+            print("Invalid parent, hence trying siblings")
+        siblings_parent_node = None
+        print("type sib=", type(siblings))
+        for node_sibling in list(siblings):
+            try:
+                print()
+                print("node_sibling=", node_sibling.spelling, end=" ")
+                print(
+                    node_sibling.extent.start.line, node_sibling.extent.end.line,
+                )
+                if node_sibling.spelling == node_inner.spelling:
+                    print("Thats me again, continue")
+                siblings_parent_node = node_sibling.lexical_parent
+                print("siblings_parent_node=", siblings_parent_node.spelling, end=" ")
+                print(
+                    siblings_parent_node.extent.start.line,
+                    siblings_parent_node.extent.end.line,
+                )
+                if siblings_parent_node and siblings_parent_node.spelling:
+                    break
+            except Exception as e:
+                print("This sibling doesnt have valid parent, lets try other siblings")
+        if not (siblings_parent_node and siblings_parent_node.spelling):
+            print("None of the siblings have valid parent either, hence returning")
+            return False
+        parent_node = siblings_parent_node
+    if (
+        node_inner.extent.start.line == parent_node.extent.start.line
+        and node_inner.extent.end.line == parent_node.extent.end.line
+    ):
+        print("Same lines as parent, hence returning")
+        return False
+    if parent_node:
+        print(
+            "Uncomenting parent (",
             parent_node.extent.start.line,
             parent_node.extent.end.line,
+            ") of child (",
+            node_inner.extent.start.line,
+            node_inner.extent.end.line,
+            ")",
         )
-        if parent_node:
-            parent_start = parent_node.extent.start.line
-            while statcom_lines[int(parent_start) - 1][:2] == "//":
-                statcom_lines[int(parent_start) - 1] = statcom_lines[
-                    int(parent_start) - 1
-                ][2:].lstrip()
-            parent_end = parent_node.extent.end.line
-            while statcom_lines[int(parent_end) - 1][:2] == "//":
-                statcom_lines[int(parent_end) - 1] = statcom_lines[int(parent_end) - 1][
-                    2:
-                ].lstrip()
+        parent_start = parent_node.extent.start.line
+        # print("parent_start B4", statcom_lines[int(parent_start) - 1])
+        while statcom_lines[int(parent_start) - 1][:2] == "//":
+            statcom_lines[int(parent_start) - 1] = statcom_lines[int(parent_start) - 1][
+                2:
+            ].lstrip()
+        dont_touch_lines.append(int(parent_start))
+
+        parent_end = parent_node.extent.end.line
+        # print("parent_end B4", statcom_lines[int(parent_end) - 1])
+        while statcom_lines[int(parent_end) - 1][:2] == "//":
+            statcom_lines[int(parent_end) - 1] = statcom_lines[int(parent_end) - 1][
+                2:
+            ].lstrip()
+        dont_touch_lines.append(int(parent_end))
+        print("dont_touch_lines=", dont_touch_lines)
+        print("Trying to recursively uncomment its grandparent too")
+        uncomment_parent_node_by_node(
+            node_inner=parent_node, siblings=parent_node.get_children()
+        )
+        return True
+
+
+def uncomment_parent_node_by_line_number(line_number):
+    node_inner = get_innermost_node_containing_line_no(tu.cursor, line_number)
+    uncomment_parent_node_by_node(node_inner=node_inner, siblings=None)
 
 
 for line in gcov_lines:  # [-200:]:
@@ -84,12 +154,20 @@ for line in gcov_lines:  # [-200:]:
         line_number = int(match.group(3))
         code = match.group(4)
         # print("Excuted", execution_count, "times, on line_no", line_number, "=>", code)
-        uncomment_parent_node(line_number)
+        uncomment_parent_node_by_line_number(line_number)
     elif re.match(pattern_comment1, line.strip()):
         match2 = re.match(pattern_comment1, line.strip())
         if match2:
             line_number = int(match2.group(2))
             code = match2.group(3)
+            if line_number in dont_touch_lines:
+                # print(statcom_lines[int(line_number) - 1])
+                print(
+                    "The line={} has already been uncommented once, hence skipping".format(
+                        line_number
+                    )
+                )
+                continue
             if code.strip() not in ["}", "} // namespace"]:
                 statcom_lines[int(line_number) - 1] = (
                     "// " + statcom_lines[int(line_number) - 1]
@@ -115,6 +193,14 @@ for line in gcov_lines:  # [-200:]:
             line_number = int(match3.group(2))
             code = match3.group(3)
             # print("pattern_#####, on line_no", line_number, "=>", code)
+            if line_number in dont_touch_lines:
+                # print(statcom_lines[int(line_number) - 1])
+                print(
+                    "The line={} has already been uncommented once, hence skipping".format(
+                        line_number
+                    )
+                )
+                continue
             if "return" not in code:
                 statcom_lines[int(line_number) - 1] = (
                     "// " + statcom_lines[int(line_number) - 1]
@@ -147,17 +233,22 @@ for line in gcov_lines:  # [-200:]:
         if match2:
             line_number = int(match2.group(2))
             code = match2.group(3)
-            if code.strip() in ["try {", "namespace "]:
+            if code.strip() in ["try"]:
                 # ie code is in ["try {"]
                 ed_line_number = get_ending_line_no_of_node_containing_line_no(
                     line_number
                 )
-                print(line_number, ed_line_number)
+                print("reverse mode:", line_number, ed_line_number)
                 try:
                     if ed_line_number and statcom_lines[ed_line_number - 1][:2] == "//":
                         statcom_lines[int(line_number) - 1] = (
                             "// " + statcom_lines[int(line_number) - 1]
                         )
+                    else:
+                        while statcom_lines[int(line_number) - 1][:2] == "//":
+                            statcom_lines[int(line_number) - 1] = statcom_lines[
+                                int(line_number) - 1
+                            ][2:].lstrip()
                 except Exception as e:
                     print(ed_line_number, line_number)
                     raise e
